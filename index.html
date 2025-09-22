@@ -111,7 +111,7 @@
             bottom: 20px;
             left: 50%;
             transform: translate(-50%, 100%);
-            background-color: #ef4444; /* red-500 */
+            background-color: #22c55e;
             color: white;
             padding: 1rem 2rem;
             border-radius: 0.5rem;
@@ -370,12 +370,15 @@
                          <button type="button" id="proposal-print-btn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
                             Gerar Proposta Final
                         </button>
+                         <button type="button" id="copy-proposal-btn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed mt-4" disabled>
+                            Copiar para Clipboard
+                        </button>
                     </div>
                 </div>
             </div>
         </main>
     </div>
-    
+
     <!-- Modal para Confirmação de Apagar -->
     <div id="delete-confirm-modal" class="modal-overlay hidden no-print">
         <div class="modal-content !max-w-md">
@@ -387,7 +390,7 @@
             </div>
         </div>
     </div>
-
+    
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- ELEMENTOS DO DOM ---
@@ -396,6 +399,7 @@
             const buildingsList = document.getElementById('buildings-list');
             const emptyListMsg = document.getElementById('empty-list-msg');
             const proposalPrintBtn = document.getElementById('proposal-print-btn');
+            const copyProposalBtn = document.getElementById('copy-proposal-btn');
             const discountInput = document.getElementById('desconto-comercial');
             const deleteConfirmModal = document.getElementById('delete-confirm-modal');
             const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
@@ -572,6 +576,7 @@
                 }
 
                 proposalPrintBtn.disabled = proposal.buildings.length === 0;
+                copyProposalBtn.disabled = proposal.buildings.length === 0;
             };
 
             const renderBuildingsList = () => {
@@ -779,6 +784,67 @@
                     printWindow.print();
                     printWindow.close();
                 };
+            });
+
+            copyProposalBtn.addEventListener('click', () => {
+                 const clientName = document.getElementById('client-name').value;
+                const projectName = document.getElementById('project-name').value;
+                if(!clientName || !projectName) {
+                    showToast("Preencha os dados do Cliente e Projeto antes de copiar a proposta.");
+                    return;
+                }
+
+                let textToCopy = `Proposta de Honorários\n\n`;
+                textToCopy += `Cliente: ${clientName}\n`;
+                textToCopy += `Empreendimento: ${projectName}\n\n`;
+                textToCopy += `--- Capítulo 1: Edifícios na Proposta ---\n`;
+
+                proposal.buildings.forEach(building => {
+                    textToCopy += `\nEdifício: ${building.data.buildingName}\n`;
+                    textToCopy += `  Localização: ${document.querySelector(`#distrito option[value="${building.data.distrito}"]`).textContent}\n`;
+                    textToCopy += `  Área de Construção: ${building.data.areaConstrucao} m²\n`;
+                    textToCopy += `  Uso: ${document.querySelector(`#tipoUtilizacao option[value="${building.data.tipoUtilizacao}"]`).textContent}\n`;
+                    textToCopy += `  Tipologia/Serviço: ${building.data.tipoUtilizacao === 'habitacao' ? building.data.tipologia : document.querySelector(`#tipoServico option[value="${building.data.tipoServico}"]`).textContent}\n`;
+                    textToCopy += `  Custo de Construção: ${formatCurrency(building.results.custoConstrucao)}\n`;
+                    textToCopy += `  Honorários Totais: ${formatCurrency(building.results.honorariosTotais)}\n`;
+                });
+
+                const totals = proposal.buildings.reduce((acc, building) => {
+                    acc.custoConstrucao += building.results.custoConstrucao;
+                    acc.honorariosTotais += building.results.honorariosTotais;
+                    acc.areaConstrucao += building.data.areaConstrucao;
+                     for (const [specialty, cost] of Object.entries(building.results.specialtyCosts)) {
+                        acc.specialtyCosts[specialty] = (acc.specialtyCosts[specialty] || 0) + cost;
+                    }
+                    return acc;
+                }, { custoConstrucao: 0, honorariosTotais: 0, areaConstrucao: 0, specialtyCosts: {} });
+                
+                const descontoPercent = (parseFloat(discountInput.value) || 0) / 100;
+                const descontoValor = totals.honorariosTotais * descontoPercent;
+                const totalComDesconto = totals.honorariosTotais - descontoValor;
+
+                textToCopy += `\n--- Capítulo 2: Totais da Proposta ---\n`;
+                textToCopy += `Área Total de Construção: ${totals.areaConstrucao.toFixed(2)} m²\n`;
+                textToCopy += `Custo Total de Construção: ${formatCurrency(totals.custoConstrucao)}\n`;
+                textToCopy += `Honorários Totais (antes de desconto): ${formatCurrency(totals.honorariosTotais)}\n`;
+                textToCopy += `Desconto Comercial (${formatPercent(descontoPercent)}): -${formatCurrency(descontoValor)}\n`;
+                textToCopy += `Total Final com Desconto: ${formatCurrency(totalComDesconto)}\n\n`;
+                textToCopy += `--- Capítulo 3: Engenharias (Detalhe Total) ---\n`;
+                
+                const sortedSpecialties = Object.entries(totals.specialtyCosts).sort((a, b) => b[1] - a[1]);
+                 for (const [name, cost] of sortedSpecialties) {
+                    if (cost > 0) {
+                        textToCopy += `${name}: ${formatCurrency(cost * (1 - descontoPercent))}\n`;
+                    }
+                }
+                
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('Proposta copiada para a área de transferência!');
             });
             
             cancelDeleteBtn.addEventListener('click', () => {
