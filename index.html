@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Honorários de Projeto</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .input-group {
+            margin-bottom: 1rem;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #475569; /* slate-600 */
+            font-weight: 500;
+        }
+        .input-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #cbd5e1; /* slate-300 */
+            border-radius: 0.5rem;
+            background-color: white;
+            transition: border-color: 0.2s;
+        }
+        .input-control:focus {
+            outline: none;
+            border-color: #2563eb; /* blue-600 */
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+        .result-card {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid #e2e8f0; /* slate-200 */
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .result-label {
+            color: #475569; /* slate-600 */
+        }
+        .result-value {
+            font-weight: 600;
+            color: #1e293b; /* slate-800 */
+        }
+        .result-value.total {
+            font-size: 1.25rem;
+            color: #166534; /* green-800 */
+        }
+        .result-value.subtotal {
+            font-size: 1.1rem;
+            color: #1d4ed8; /* blue-700 */
+        }
+        fieldset {
+            border: 1px solid #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        legend {
+            padding: 0 0.5rem;
+            font-weight: 600;
+            color: #334155; /* slate-700 */
+        }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 250; 
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay:not(.hidden) .modal-content {
+            transform: scale(1);
+        }
+        
+        /* Toast Notification */
+        #toast-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translate(-50%, 100%);
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 100;
+            transition: transform 0.5s ease-in-out;
+            opacity: 0;
+        }
+        #toast-notification.show {
+            transform: translate(-50%, 0);
+            opacity: 1;
+        }
+        
+        /* Print Styles */
+        @media print {
+             @page {
+                size: A4 portrait;
+                margin: 1.5cm;
+            }
+            body {
+                background-color: white;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .no-print, .no-print * {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-800">Gerador de Propostas de Projeto</h1>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Coluna de Inputs -->
+            <form id="calculator-form" class="lg:col-span-4 bg-white p-6 rounded-lg shadow-md h-fit">
+                 <fieldset>
+                    <legend>Dados do Cliente e Projeto</legend>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="input-group md:col-span-2">
+                            <label for="client-name">Nome do Cliente</label>
+                            <input type="text" id="client-name" class="input-control" required>
+                        </div>
+                        <div class="input-group md:col-span-2">
+                            <label for="project-name">Nome do Empreendimento</label>
+                            <input type="text" id="project-name" class="input-control" required>
+                        </div>
+                    </div>
+                </fieldset>
+                 <h2 class="text-xl font-bold text-slate-800 mb-4 mt-6">Dados do Edifício</h2>
+                 <input type="hidden" id="building-id">
+                
+                <fieldset>
+                    <legend>Identificação e Localização</legend>
+                     <div class="input-group">
+                        <label for="building-name">Nome do Edifício (ex: Bloco A, Moradia Principal)</label>
+                        <input type="text" id="building-name" class="input-control" required placeholder="Bloco A">
+                    </div>
+                    <div class="input-group">
+                        <label for="distrito">Distrito</label>
+                        <select id="distrito" class="input-control">
+                            <option value="aveiro">Aveiro</option>
+                            <option value="beja">Beja</option>
+                            <option value="braga">Braga</option>
+                            <option value="braganca">Bragança</option>
+                            <option value="castelo_branco">Castelo Branco</option>
+                            <option value="coimbra">Coimbra</option>
+                            <option value="evora">Évora</option>
+                            <option value="faro">Faro</option>
+                            <option value="guarda">Guarda</option>
+                            <option value="leiria">Leiria</option>
+                            <option value="lisboa" selected>Lisboa</option>
+                            <option value="portalegre">Portalegre</option>
+                            <option value="porto">Porto</option>
+                            <option value="santarem">Santarém</option>
+                            <option value="setubal">Setúbal</option>
+                            <option value="viana_castelo">Viana do Castelo</option>
+                            <option value="vila_real">Vila Real</option>
+                            <option value="viseu">Viseu</option>
+                            <option value="acores">R.A. Açores</option>
+                            <option value="madeira">R.A. Madeira</option>
+                        </select>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Características</legend>
+                    <div class="input-group">
+                        <label for="tipoEdificio">Tipo de Edifício</label>
+                        <select id="tipoEdificio" class="input-control">
+                            <option value="novo">Edifício Novo</option>
+                            <option value="existente">Edifício Existente</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group hidden" id="intervencao-group">
+                        <label for="tipoIntervencao">Nível de Intervenção</label>
+                        <select id="tipoIntervencao" class="input-control">
+                            <option value="pequena">Pequena</option>
+                            <option value="media">Média</option>
+                            <option value="grande">Grande</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="tipoUtilizacao">Utilização</label>
+                        <select id="tipoUtilizacao" class="input-control">
+                            <option value="habitacao">Habitação</option>
+                            <option value="servicos">Serviços</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="gama">Gama</label>
+                        <select id="gama" class="input-control">
+                            <option value="baixa">Baixa</option>
+                            <option value="media" selected>Média</option>
+                            <option value="alta">Alta</option>
+                        </select>
+                    </div>
+
+                    <div id="habitacao-options">
+                        <div class="input-group">
+                            <label for="tipologia">Tipologia</label>
+                            <select id="tipologia" class="input-control">
+                                <option value="T0">T0</option>
+                                <option value="T1">T1</option>
+                                <option value="T2" selected>T2</option>
+                                <option value="T3">T3</option>
+                                <option value="T4">T4</option>
+                                <option value="T5">T5</option>
+                                <option value="T6">T6+</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="servicos-options" class="hidden">
+                         <div class="input-group">
+                            <label for="tipoServico">Tipo de Serviço</label>
+                            <select id="tipoServico" class="input-control">
+                                <option value="escritorios">Escritórios</option>
+                                <option value="hotelaria">Hotelaria</option>
+                                <option value="comercio">Comércio</option>
+                                <option value="restauracao">Restauração</option>
+                                <option value="industrial">Industrial</option>
+                                <option value="saude">Saúde</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Áreas e Custos Adicionais</legend>
+                     <div class="input-group">
+                        <label for="areaLote">Área do Lote (m²)</label>
+                        <input type="number" id="areaLote" class="input-control" value="500" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label for="areaConstrucao">Área de Construção (m²)</label>
+                        <input type="number" id="areaConstrucao" class="input-control" value="200" min="0">
+                    </div>
+                     <div class="input-group">
+                        <label for="adicional-custo-m2">Adicional €/m²</label>
+                        <input type="number" id="adicional-custo-m2" class="input-control" value="0" min="0">
+                    </div>
+                </fieldset>
+                
+                <fieldset>
+                    <legend>Divisão de Honorários (%)</legend>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label for="percentagem-arquitetura">Arquitetura</label>
+                            <input type="number" id="percentagem-arquitetura" class="input-control" value="55" min="0" max="100">
+                        </div>
+                        <div class="input-group">
+                            <label for="percentagem-engenharia">Engenharias</label>
+                            <input type="number" id="percentagem-engenharia" class="input-control" value="45" min="0" max="100">
+                        </div>
+                    </div>
+                </fieldset>
+
+                 <div class="mt-6">
+                    <button type="button" id="add-update-building-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                        Adicionar Edifício à Proposta
+                    </button>
+                </div>
+
+            </form>
+            
+            <!-- Coluna Direita - Proposta e Totais -->
+            <div class="lg:col-span-8 space-y-8">
+                 <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-bold text-slate-800 mb-4">Edifícios na Proposta</h2>
+                    <div id="buildings-list" class="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+                        <p id="empty-list-msg" class="text-slate-500 text-center py-4">Nenhum edifício adicionado ainda.</p>
+                    </div>
+                 </div>
+                 <div class="result-card sticky top-8">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-4">Totais da Proposta</h2>
+                    
+                    <div class="space-y-4">
+                         <div class="result-item">
+                            <span class="result-label text-lg">Área Total de Construção</span>
+                            <span id="total-areaConstrucao" class="result-value text-xl font-bold">0 m²</span>
+                        </div>
+                        <div class="result-item flex-col items-start">
+                            <div class="w-full flex justify-between items-baseline">
+                                <span class="result-label text-lg">Custo Total de Construção</span>
+                                <span id="total-custoConstrucao" class="result-value text-xl font-bold">€0,00</span>
+                            </div>
+                            <div id="total-custoM2" class="w-full text-right text-sm text-slate-500 mt-1"></div>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label text-lg font-bold">Honorários Totais</span>
+                            <span id="total-honorarios" class="result-value total">€0,00</span>
+                        </div>
+                        <div class="result-item">
+                            <label for="desconto-comercial" class="result-label text-lg">Desconto Comercial (%)</label>
+                            <input type="number" id="desconto-comercial" class="input-control w-24 text-right" value="0" min="0" max="100">
+                        </div>
+                        <div class="result-item font-bold text-green-700 border-t-2 border-green-600 pt-4">
+                            <span class="result-label text-xl">Total Final com Desconto</span>
+                            <span id="total-final" class="result-value total text-2xl">€0,00</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-8">
+                        <h3 class="text-xl font-semibold text-slate-700 mb-4">Divisão de Honorários (Total)</h3>
+                         <div class="result-item">
+                            <div>
+                                <span class="result-label">Arquitetura</span>
+                                <div id="total-honorariosArquiteturaPercent" class="text-xs text-slate-500 mt-1"></div>
+                            </div>
+                            <span id="total-honorariosArquitetura" class="result-value subtotal">€0,00</span>
+                        </div>
+                         <div class="result-item">
+                             <div>
+                                <span class="result-label">Engenharias</span>
+                                 <div id="total-honorariosEngenhariaPercent" class="text-xs text-slate-500 mt-1"></div>
+                            </div>
+                            <span id="total-honorariosEngenharia" class="result-value subtotal">€0,00</span>
+                        </div>
+                    </div>
+                     <div class="mt-8">
+                        <h3 class="text-xl font-semibold text-slate-700 mb-4">Detalhe Estimado - Engenharias (Total)</h3>
+                        <div id="total-detalheEngenharias" class="space-y-1 max-h-48 overflow-y-auto pr-2">
+                            <!-- Details will be inserted via JS -->
+                        </div>
+                    </div>
+                     <div class="mt-6 border-t pt-4">
+                         <button type="button" id="proposal-print-btn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                            Gerar Proposta Final
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Modal para Confirmação de Apagar -->
+    <div id="delete-confirm-modal" class="modal-overlay hidden no-print">
+        <div class="modal-content !max-w-md">
+            <h2 class="text-xl font-bold text-slate-800 mb-4">Confirmar Ação</h2>
+            <p class="text-slate-600 mb-6">Tem a certeza de que pretende apagar este edifício da proposta?</p>
+            <div class="flex justify-end gap-4">
+                <button type="button" id="cancel-delete-btn" class="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300">Cancelar</button>
+                <button type="button" id="confirm-delete-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700">Apagar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- ELEMENTOS DO DOM ---
+            const form = document.getElementById('calculator-form');
+            const addUpdateBtn = document.getElementById('add-update-building-btn');
+            const buildingsList = document.getElementById('buildings-list');
+            const emptyListMsg = document.getElementById('empty-list-msg');
+            const proposalPrintBtn = document.getElementById('proposal-print-btn');
+            const discountInput = document.getElementById('desconto-comercial');
+            const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+            const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+            const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+            
+            let proposal = { buildings: [] };
+            let editingBuildingId = null;
+            let buildingIdToDelete = null;
+
+            // --- CONSTANTES DE CÁLCULO (AJUSTÁVEIS) ---
+             const CUSTO_BASE_M2 = 1300; 
+            const MODIFICADORES = {
+                gama: { baixa: 0.75, media: 1.0, alta: 1.5 },
+                intervencao: { pequena: 0.35, media: 0.6, grande: 0.8 },
+                distrito: { lisboa: 1.15, porto: 1.10, faro: 1.10, setubal: 1.05, braga: 1.05, aveiro: 1.05, coimbra: 1.05, madeira: 1.05, leiria: 1.0, viseu: 1.0, viana_castelo: 1.0, santarem: 1.0, acores: 1.0, evora: 0.95, beja: 0.95, castelo_branco: 0.90, vila_real: 0.90, braganca: 0.85, guarda: 0.85, portalegre: 0.85 },
+                tipologia: { T0: 1.05, T1: 1.0, T2: 1.0, T3: 1.05, T4: 1.1, T5: 1.15, T6: 1.2 },
+                servico: { escritorios: 1.0, comercio: 1.0, restauracao: 1.15, hotelaria: 1.25, saude: 1.3, industrial: 0.8, outro: 1.0 }
+            };
+            const FASES_PROJETO = { pip: 0.05, ep: 0.20, lic: 0.35, exe: 0.40 };
+            const DISTRIBUICAO_ENGENHARIA = {
+                'Estruturas e Escavação': 0.24, 'Instalações Hidráulicas (Água e Esgotos)': 0.10, 'Instalações Elétricas': 0.10, 'AVAC (Climatização)': 0.10, 'Segurança Contra Incêndios': 0.08, 'Comportamento Térmico (REH/PCE)': 0.08, 'ITEL (Telecomunicações)': 0.07, 'Gás': 0.04, 'Acústica': 0.04, 'Contenção Periférica': 0.04, 'Instalações Eletromecânicas': 0.03, 'Segurança e Saúde (PSS)': 0.02, 'Gestão de Resíduos (PPGRCD)': 0.02, 'Segurança Integrada': 0.02, 'Controlo de Acessos': 0.02,
+                'Paisagismo': 0
+            };
+             const CUSTO_M2_PAISAGISMO = 1.2;
+            
+            // --- FUNÇÕES ---
+            const formatCurrency = (value) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value);
+            const formatPercent = (value) => {
+                 if (isNaN(value) || !isFinite(value)) return '0,0%';
+                return new Intl.NumberFormat('pt-PT', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
+            }
+            
+            const calcularParaEdificio = (buildingData) => {
+                const { areaLote, areaConstrucao, distrito, tipoEdificio, tipoIntervencao, tipoUtilizacao, gama, tipologia, tipoServico, adicionalCustoM2, percentagemArquitetura, percentagemEngenharia } = buildingData;
+
+                let custoM2 = CUSTO_BASE_M2 * MODIFICADORES.distrito[distrito] * MODIFICADORES.gama[gama];
+                
+                if (tipoUtilizacao === 'habitacao') {
+                    custoM2 *= MODIFICADORES.tipologia[tipologia];
+                } else {
+                    custoM2 *= MODIFICADORES.servico[tipoServico];
+                }
+                if (tipoEdificio === 'existente') custoM2 *= MODIFICADORES.intervencao[tipoIntervencao];
+
+                custoM2 += adicionalCustoM2;
+
+                let custoConstrucao = areaConstrucao * custoM2;
+                const percentagemBase = Math.max(0.04, Math.min(0.12, 0.6 * Math.pow(custoConstrucao, -0.1)));
+                let honorariosBase = custoConstrucao * percentagemBase;
+                
+                let fatorFases = 1.0;
+                
+                const honorariosFinais = honorariosBase * fatorFases;
+                const hArquitetura = honorariosFinais * percentagemArquitetura;
+                const hEngenhariaBase = honorariosFinais * percentagemEngenharia;
+
+                const areaExterior = Math.max(0, areaLote - areaConstrucao);
+                const hPaisagismoPotencial = Math.min(
+                    areaExterior * CUSTO_M2_PAISAGISMO * MODIFICADORES.gama[gama],
+                    hEngenhariaBase * 0.20
+                );
+                
+                const potStandard = hEngenhariaBase - hPaisagismoPotencial;
+                
+                const specialtyCosts = {};
+                for (const [nome, percentagem] of Object.entries(DISTRIBUICAO_ENGENHARIA)) {
+                    if (nome === 'Paisagismo') {
+                        specialtyCosts[nome] = hPaisagismoPotencial;
+                    } else {
+                        specialtyCosts[nome] = potStandard * percentagem;
+                    }
+                }
+
+                return {
+                    custoConstrucao,
+                    honorariosTotais: honorariosFinais,
+                    honorariosArquitetura: hArquitetura,
+                    honorariosEngenharia: hEngenhariaBase,
+                    specialtyCosts
+                };
+            };
+            
+            const showToast = (message) => {
+                const toast = document.createElement('div');
+                toast.id = 'toast-notification';
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.classList.add('show');
+                    setTimeout(() => {
+                        toast.classList.remove('show');
+                        setTimeout(() => document.body.removeChild(toast), 500);
+                    }, 3000);
+                }, 10);
+            };
+
+            const resetForm = () => {
+                document.getElementById('building-name').value = '';
+                document.getElementById('distrito').value = 'lisboa';
+                document.getElementById('tipoEdificio').value = 'novo';
+                document.getElementById('tipoUtilizacao').value = 'habitacao';
+                document.getElementById('gama').value = 'media';
+                document.getElementById('tipologia').value = 'T2';
+                document.getElementById('tipoServico').value = 'escritorios';
+                document.getElementById('areaLote').value = '500';
+                document.getElementById('areaConstrucao').value = '200';
+                document.getElementById('adicional-custo-m2').value = '0';
+                
+                document.getElementById('building-id').value = '';
+                editingBuildingId = null;
+                addUpdateBtn.textContent = 'Adicionar Edifício à Proposta';
+                 document.getElementById('tipoUtilizacao').dispatchEvent(new Event('change'));
+                 document.getElementById('percentagem-arquitetura').value = 55;
+                 document.getElementById('percentagem-engenharia').value = 45;
+            };
+            
+            const updateProposalTotals = () => {
+                const totals = proposal.buildings.reduce((acc, building) => {
+                    acc.custoConstrucao += building.results.custoConstrucao;
+                    acc.honorariosTotais += building.results.honorariosTotais;
+                    acc.honorariosArquitetura += building.results.honorariosArquitetura;
+                    acc.honorariosEngenharia += building.results.honorariosEngenharia;
+                    acc.areaConstrucao += building.data.areaConstrucao;
+
+                    for (const [specialty, cost] of Object.entries(building.results.specialtyCosts)) {
+                        acc.specialtyCosts[specialty] = (acc.specialtyCosts[specialty] || 0) + cost;
+                    }
+                    return acc;
+                }, { custoConstrucao: 0, honorariosTotais: 0, honorariosArquitetura: 0, honorariosEngenharia: 0, areaConstrucao: 0, specialtyCosts: {} });
+
+                document.getElementById('total-areaConstrucao').textContent = `${totals.areaConstrucao.toFixed(2)} m²`;
+                document.getElementById('total-custoConstrucao').textContent = formatCurrency(totals.custoConstrucao);
+                
+                const custoM2Total = totals.areaConstrucao > 0 ? totals.custoConstrucao / totals.areaConstrucao : 0;
+                document.getElementById('total-custoM2').textContent = `${formatCurrency(custoM2Total)}/m²`;
+
+                document.getElementById('total-honorarios').textContent = formatCurrency(totals.honorariosTotais);
+                
+                const descontoPercent = (parseFloat(discountInput.value) || 0) / 100;
+                const descontoValor = totals.honorariosTotais * descontoPercent;
+                const totalComDesconto = totals.honorariosTotais - descontoValor;
+                document.getElementById('total-final').textContent = formatCurrency(totalComDesconto);
+                
+                const honorariosArquiteturaComDesconto = totals.honorariosArquitetura * (1 - descontoPercent);
+                const honorariosEngenhariaComDesconto = totals.honorariosEngenharia * (1 - descontoPercent);
+
+                document.getElementById('total-honorariosArquitetura').textContent = formatCurrency(honorariosArquiteturaComDesconto);
+                const percentArqSobreConstrucao = totals.custoConstrucao > 0 ? honorariosArquiteturaComDesconto / totals.custoConstrucao : 0;
+                document.getElementById('total-honorariosArquiteturaPercent').textContent = `(${formatPercent(percentArqSobreConstrucao)} do Custo de Construção)`;
+
+                document.getElementById('total-honorariosEngenharia').textContent = formatCurrency(honorariosEngenhariaComDesconto);
+                const percentEngSobreConstrucao = totals.custoConstrucao > 0 ? honorariosEngenhariaComDesconto / totals.custoConstrucao : 0;
+                document.getElementById('total-honorariosEngenhariaPercent').textContent = `(${formatPercent(percentEngSobreConstrucao)} do Custo de Construção)`;
+                
+                const detalheContainer = document.getElementById('total-detalheEngenharias');
+                detalheContainer.innerHTML = '';
+                const sortedSpecialties = Object.entries(totals.specialtyCosts).sort((a, b) => b[1] - a[1]);
+
+                if (sortedSpecialties.length === 0 || sortedSpecialties.every(s => s[1] === 0)) {
+                    detalheContainer.innerHTML = '<p class="text-slate-500 text-center py-4">Nenhuma especialidade de engenharia calculada.</p>';
+                } else {
+                    for (const [name, cost] of sortedSpecialties) {
+                        if (cost > 0) {
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'result-item text-sm py-2';
+                            const discountedCost = cost * (1-descontoPercent);
+                            itemDiv.innerHTML = `
+                                <span class="result-label">${name}</span>
+                                <span class="result-value">${formatCurrency(discountedCost)}</span>
+                            `;
+                            detalheContainer.appendChild(itemDiv);
+                        }
+                    }
+                }
+
+                proposalPrintBtn.disabled = proposal.buildings.length === 0;
+            };
+
+            const renderBuildingsList = () => {
+                buildingsList.innerHTML = '';
+                if (proposal.buildings.length === 0) {
+                    buildingsList.appendChild(emptyListMsg);
+                } else {
+                    proposal.buildings.forEach(building => {
+                        const item = document.createElement('div');
+                        item.className = 'p-4 border rounded-lg';
+                        
+                        const distritoLabel = document.querySelector(`#distrito option[value="${building.data.distrito}"]`).textContent;
+                        const usoLabel = document.querySelector(`#tipoUtilizacao option[value="${building.data.tipoUtilizacao}"]`).textContent;
+                        
+                        let tipologiaLabelText = '';
+                        let tipologiaValue = '';
+
+                        if (building.data.tipoUtilizacao === 'habitacao') {
+                           tipologiaLabelText = 'Tipologia';
+                           tipologiaValue = building.data.tipologia;
+                        } else {
+                           tipologiaLabelText = 'Serviço';
+                           tipologiaValue = document.querySelector(`#tipoServico option[value="${building.data.tipoServico}"]`).textContent;
+                        }
+
+
+                        item.innerHTML = `
+                             <div class="flex justify-between items-start">
+                               <div>
+                                    <p class="font-semibold text-lg">${building.data.buildingName}</p>
+                                     <div class="text-sm text-slate-500 grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                                        <span><strong>Local:</strong> ${distritoLabel}</span>
+                                        <span><strong>Uso:</strong> ${usoLabel}</span>
+                                        <span><strong>${tipologiaLabelText}:</strong> ${tipologiaValue}</span>
+                                        <span><strong>Área:</strong> ${building.data.areaConstrucao} m²</span>
+                                        <span><strong>Custo Obra:</strong> ${formatCurrency(building.results.custoConstrucao)}</span>
+                                        <span><strong>Honorários:</strong> ${formatCurrency(building.results.honorariosTotais)}</span>
+                                    </div>
+                               </div>
+                                <div class="flex flex-col gap-2 items-end flex-shrink-0 ml-4">
+                                    <button data-id="${building.id}" class="edit-btn bg-blue-100 text-blue-800 text-xs font-bold py-1 px-3 rounded-md hover:bg-blue-200 w-full text-center">Editar</button>
+                                    <button data-id="${building.id}" class="delete-btn bg-red-100 text-red-800 text-xs font-bold py-1 px-3 rounded-md hover:bg-red-200 w-full text-center">Apagar</button>
+                                </div>
+                            </div>
+                           `;
+                        buildingsList.appendChild(item);
+                    });
+                }
+            };
+            
+            addUpdateBtn.addEventListener('click', () => {
+                if (!form.checkValidity()) {
+                    showToast("Por favor preencha todos os campos obrigatórios do edifício.");
+                    form.reportValidity();
+                    return;
+                }
+
+                const buildingData = {
+                    buildingName: document.getElementById('building-name').value,
+                    distrito: document.getElementById('distrito').value,
+                    tipoEdificio: document.getElementById('tipoEdificio').value,
+                    tipoIntervencao: document.getElementById('tipoIntervencao').value,
+                    tipoUtilizacao: document.getElementById('tipoUtilizacao').value,
+                    gama: document.getElementById('gama').value,
+                    tipologia: document.getElementById('tipologia').value,
+                    tipoServico: document.getElementById('tipoServico').value,
+                    areaLote: parseFloat(document.getElementById('areaLote').value),
+                    areaConstrucao: parseFloat(document.getElementById('areaConstrucao').value),
+                    adicionalCustoM2: parseFloat(document.getElementById('adicional-custo-m2').value),
+                    percentagemArquitetura: parseFloat(document.getElementById('percentagem-arquitetura').value) / 100,
+                    percentagemEngenharia: parseFloat(document.getElementById('percentagem-engenharia').value) / 100
+                };
+                
+                const results = calcularParaEdificio(buildingData);
+                
+                if (editingBuildingId) {
+                    const index = proposal.buildings.findIndex(b => b.id === editingBuildingId);
+                    proposal.buildings[index] = { ...proposal.buildings[index], data: buildingData, results };
+                    showToast('Edifício atualizado com sucesso!');
+                } else {
+                    proposal.buildings.push({ id: Date.now().toString(), data: buildingData, results });
+                    showToast('Edifício adicionado à proposta!');
+                }
+                
+                renderBuildingsList();
+                updateProposalTotals();
+                resetForm();
+            });
+
+            buildingsList.addEventListener('click', (e) => {
+                const id = e.target.dataset.id;
+                if (!id) return;
+
+                if (e.target.classList.contains('edit-btn')) {
+                    const building = proposal.buildings.find(b => b.id === id);
+                    if (building) {
+                        editingBuildingId = id;
+                        document.getElementById('building-id').value = id;
+                        
+                        Object.keys(building.data).forEach(key => {
+                             const formKey = key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+                             const el = document.getElementById(formKey);
+                             if (el) {
+                                if (el.type === 'checkbox') {
+                                    el.checked = building.data[key];
+                                } else if(key.startsWith('percentagem')) {
+                                    el.value = building.data[key] * 100;
+                                }
+                                else {
+                                    el.value = building.data[key];
+                                }
+                            }
+                        });
+
+                         // Manually trigger UI updates for dependent dropdowns
+                        document.getElementById('tipoUtilizacao').dispatchEvent(new Event('change'));
+                        document.getElementById('tipoEdificio').dispatchEvent(new Event('change'));
+
+                        addUpdateBtn.textContent = 'Atualizar Edifício';
+                    }
+                }
+
+                if (e.target.classList.contains('delete-btn')) {
+                    buildingIdToDelete = id;
+                    deleteConfirmModal.classList.remove('hidden');
+                }
+            });
+            
+            proposalPrintBtn.addEventListener('click', () => {
+                const clientName = document.getElementById('client-name').value;
+                const projectName = document.getElementById('project-name').value;
+                if(!clientName || !projectName) {
+                    showToast("Preencha os dados do Cliente e Projeto antes de gerar a proposta.");
+                    return;
+                }
+
+                const printWindow = window.open('', '_blank');
+                let proposalHTML = `
+                    <div style="font-family: 'Inter', sans-serif; padding: 1.5cm;">
+                        <h1 style="font-size: 24pt; font-weight: bold;">Proposta de Honorários</h1>
+                        <div style="margin: 1rem 0;">
+                            <p><strong>Cliente:</strong> ${clientName}</p>
+                            <p><strong>Empreendimento:</strong> ${projectName}</p>
+                        </div>
+                        <hr style="margin: 1rem 0;" />
+                        
+                        <h2 style="font-size: 18pt; font-weight: bold; margin-top: 1.5rem;">Capítulo 1: Edifícios na Proposta</h2>
+                `;
+
+                proposal.buildings.forEach(building => {
+                     proposalHTML += `
+                        <h3 style="font-size: 14pt; font-weight: bold; margin-top: 1.5rem; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem;">Edifício: ${building.data.buildingName}</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                           <p><strong>Localização:</strong> ${document.querySelector(`#distrito option[value="${building.data.distrito}"]`).textContent}</p>
+                           <p><strong>Área de Construção:</strong> ${building.data.areaConstrucao} m²</p>
+                           <p><strong>Uso:</strong> ${document.querySelector(`#tipoUtilizacao option[value="${building.data.tipoUtilizacao}"]`).textContent}</p>
+                           <p><strong>Tipologia/Serviço:</strong> ${building.data.tipoUtilizacao === 'habitacao' ? building.data.tipologia : document.querySelector(`#tipoServico option[value="${building.data.tipoServico}"]`).textContent}</p>
+                        </div>
+                        <p><strong>Custo de Construção:</strong> ${formatCurrency(building.results.custoConstrucao)}</p>
+                        <p><strong>Honorários Totais:</strong> ${formatCurrency(building.results.honorariosTotais)}</p>
+                     `;
+                });
+
+                const totals = proposal.buildings.reduce((acc, building) => {
+                    acc.custoConstrucao += building.results.custoConstrucao;
+                    acc.honorariosTotais += building.results.honorariosTotais;
+                    acc.areaConstrucao += building.data.areaConstrucao;
+                     for (const [specialty, cost] of Object.entries(building.results.specialtyCosts)) {
+                        acc.specialtyCosts[specialty] = (acc.specialtyCosts[specialty] || 0) + cost;
+                    }
+                    return acc;
+                }, { custoConstrucao: 0, honorariosTotais: 0, areaConstrucao: 0, specialtyCosts: {} });
+                
+                const descontoPercent = (parseFloat(discountInput.value) || 0) / 100;
+                const descontoValor = totals.honorariosTotais * descontoPercent;
+                const totalComDesconto = totals.honorariosTotais - descontoValor;
+
+                 proposalHTML += `
+                    <hr style="margin: 2rem 0;" />
+                    <h2 style="font-size: 18pt; font-weight: bold;">Capítulo 2: Totais da Proposta</h2>
+                    <p><strong>Área Total de Construção:</strong> ${totals.areaConstrucao.toFixed(2)} m²</p>
+                    <p><strong>Custo Total de Construção:</strong> ${formatCurrency(totals.custoConstrucao)}</p>
+                    <p><strong>Honorários Totais (antes de desconto):</strong> ${formatCurrency(totals.honorariosTotais)}</p>
+                    <p><strong>Desconto Comercial (${formatPercent(descontoPercent)}):</strong> -${formatCurrency(descontoValor)}</p>
+                    <p style="font-size: 16pt; font-weight: bold; color: #166534;"><strong>Total Final com Desconto:</strong> ${formatCurrency(totalComDesconto)}</p>
+                    <hr style="margin: 2rem 0;" />
+                    <h2 style="font-size: 18pt; font-weight: bold;">Capítulo 3: Engenharias (Detalhe Total)</h2>
+                 `;
+                
+                const sortedSpecialties = Object.entries(totals.specialtyCosts).sort((a, b) => b[1] - a[1]);
+                 for (const [name, cost] of sortedSpecialties) {
+                    if (cost > 0) {
+                        proposalHTML += `<p><strong>${name}:</strong> ${formatCurrency(cost * (1 - descontoPercent))}</p>`;
+                    }
+                }
+
+
+                printWindow.document.write('<!DOCTYPE html><html><head><title>Proposta</title>');
+                printWindow.document.write('<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">');
+                printWindow.document.write('</head><body>');
+                printWindow.document.write(proposalHTML);
+                printWindow.document.write('</body></html>');
+                printWindow.document.close();
+                printWindow.onload = () => {
+                    printWindow.print();
+                    printWindow.close();
+                };
+            });
+            
+            cancelDeleteBtn.addEventListener('click', () => {
+                deleteConfirmModal.classList.add('hidden');
+                buildingIdToDelete = null;
+            });
+            
+            confirmDeleteBtn.addEventListener('click', () => {
+                 if (buildingIdToDelete) {
+                    proposal.buildings = proposal.buildings.filter(b => b.id !== buildingIdToDelete);
+                    renderBuildingsList();
+                    updateProposalTotals();
+                    showToast('Edifício apagado.');
+                    deleteConfirmModal.classList.add('hidden');
+                    buildingIdToDelete = null;
+                }
+            });
+            
+            document.getElementById('tipoUtilizacao').addEventListener('change', () => {
+                const isHabitacao = document.getElementById('tipoUtilizacao').value === 'habitacao';
+                document.getElementById('habitacao-options').classList.toggle('hidden', !isHabitacao);
+                document.getElementById('servicos-options').classList.toggle('hidden', isHabitacao);
+            });
+            
+            document.getElementById('tipoEdificio').addEventListener('change', () => {
+                const isExistente = document.getElementById('tipoEdificio').value === 'existente';
+                 document.getElementById('intervencao-group').classList.toggle('hidden', !isExistente);
+            });
+
+             const percentArq = document.getElementById('percentagem-arquitetura');
+            const percentEng = document.getElementById('percentagem-engenharia');
+
+            percentArq.addEventListener('input', () => {
+                const val = parseFloat(percentArq.value);
+                if (val >= 0 && val <= 100) {
+                    percentEng.value = 100 - val;
+                }
+            });
+
+            percentEng.addEventListener('input', () => {
+                const val = parseFloat(percentEng.value);
+                if (val >= 0 && val <= 100) {
+                    percentArq.value = 100 - val;
+                }
+            });
+            
+            discountInput.addEventListener('input', updateProposalTotals);
+            
+            // --- INICIALIZAÇÃO ---
+            resetForm();
+        });
+    </script>
+</body>
+</html>
+
